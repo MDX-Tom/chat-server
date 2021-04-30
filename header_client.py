@@ -1,14 +1,11 @@
 from enum import Enum
 from struct import Struct, calcsize
 
+from header_server import ChatContentType, Status, HeaderBase
+
 ########################################################################
 # ENUM
 ########################################################################
-
-
-class ChatContentType(Enum):
-    TEXT = 0
-    FILE = 1
 
 
 class ClientMsgType(Enum):
@@ -19,63 +16,6 @@ class ClientMsgType(Enum):
     CHAT_REQUEST = 99,
 
 
-class ServerMsgType(Enum):
-    MSG_SERVER_ACK = 1,  # Reliable UDP
-
-    CHAT_CONTENT_SERVER = 0,
-    LOGIN_REPLY = 2, LOGOUT_REPLY = 3,
-    CHAT_REQUEST_REPLY = 99
-
-########################################################################
-# Base of Headers
-########################################################################
-
-
-class HeaderBase:
-    def __init__(self):
-        self.struct = "!HHB"
-
-        self.headerSize = calcsize(self.struct)
-        self.packetSize = self.headerSize
-        self.msgType = 0
-
-
-'''
-    struct HeaderBase
-    {
-        quint16 headerSize;
-        quint16 packetSize;
-        quint8 msgType;
-    }; 
-'''
-
-########################################################################
-# PACKET REPLY (ACK Message)
-########################################################################
-
-
-class PacketReplyHeader:
-    def __init__(self):
-        self.struct = "!HHB16s"
-
-        self.headerSize = calcsize(self.struct)
-        self.packetSize = self.headerSize
-        self.msgType = ServerMsgType.MSG_SERVER_ACK.value
-
-        self.md5Hash = "0000000000000000"
-
-
-'''
-    struct PacketReplyHeader
-    {
-        quint16 headerSize = sizeof(PacketReplyHeader);
-        quint16 packetSize = sizeof(PacketReplyHeader);
-        quint8 msgType = ServerMsgType::MSG_SERVER_ACK;
-
-        unsigned char md5Hash[16];
-    };
-'''
-
 ########################################################################
 # LOGIN REQUEST
 ########################################################################
@@ -83,26 +23,54 @@ class PacketReplyHeader:
 
 class LoginRequestHeader:
     def __init__(self):
-        self.struct = 0
+        self.struct = "!HHBH25s"
 
-        self.self.headerSize = calcsize(self.struct)
+        self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
         self.msgType = ClientMsgType.LOGIN_REQUEST.value
 
         self.thisUserID = 0
-        self.password = ""
+        self.password = "0123456789012345678901234"
+
+
+'''
+    struct LoginRequestHeader
+    {
+        quint16 headerSize = sizeof(LoginRequestHeader); // in bytes
+        quint16 packetSize; // in bytes (= headerSize + payloadSize)
+        quint8 msgType = ClientMsgType::LOGIN_REQUEST;
+
+        quint16 thisUserID;
+        quint8 password[25];
+    };
+'''
 
 ########################################################################
 # LOGOUT REQUEST
 ########################################################################
 
-########################################################################
-# LOGIN REPLY
-########################################################################
 
-########################################################################
-# LOGOUT REPLY
-########################################################################
+class LogoutRequestHeader:
+    def __init__(self):
+        self.struct = "!HHBH"
+
+        self.headerSize = calcsize(self.struct)
+        self.packetSize = self.headerSize
+        self.msgType = ClientMsgType.LOGOUT_REQUEST.value
+
+        self.thisUserID = 0
+
+
+'''
+    struct LogoutRequestHeader
+    {
+        quint16 headerSize = sizeof(LogoutRequestHeader); // in bytes
+        quint16 packetSize; // in bytes (= headerSize + payloadSize)
+        quint8 msgType = ClientMsgType::LOGOUT_REQUEST;
+
+        quint16 thisUserID;
+    };
+'''
 
 ########################################################################
 # ChatContent (Text)
@@ -115,7 +83,7 @@ class TextMsgHeader:
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
-        self.msgType = 0
+        self.msgType = ClientMsgType.CHAT_CONTENT_CLIENT.value
 
         self.fromUserID = 0
         self.targetUserID = 0
@@ -146,11 +114,11 @@ class FileMsgHeader:
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
-        self.msgType = 0
+        self.msgType = ClientMsgType.CHAT_CONTENT_CLIENT.value
 
         self.fromUserID = 0
         self.targetUserID = 0
-        self.contentType = ChatContentType.File.value
+        self.contentType = ChatContentType.FILE.value
 
         self.packetCountTotal = 1
         self.packetCountCurrent = 1
@@ -180,13 +148,22 @@ class FileMsgHeader:
 
 class ChatRequestHeader:
     def __init__(self):
-        pass
+        self.struct = "!HHBH"
 
-########################################################################
-# CHAT REQUEST REPLY
-########################################################################
+        self.headerSize = calcsize(self.struct)
+        self.packetSize = self.headerSize
+        self.msgType = ClientMsgType.CHAT_REQUEST.value
+
+        self.thisUserID = 0
 
 
-class ChatRequestReplyHeader:
-    def __init__(self):
-        pass
+'''
+    struct ChatRequestHeader
+    {
+        quint16 headerSize = sizeof(ChatRequestHeader); // in bytes
+        quint16 packetSize; // in bytes (= headerSize + payloadSize)
+        quint8 msgType = ClientMsgType::CHAT_REQUEST;
+
+        quint16 thisUserID;
+    };
+'''

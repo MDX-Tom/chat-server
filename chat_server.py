@@ -9,7 +9,8 @@ import zlib
 import hashlib
 
 from chat_data import *
-from udp_packet_headers import *
+import header_server
+import header_client
 
 localIP = "192.168.3.131"
 localPort = 8002
@@ -32,7 +33,7 @@ def md5(bytes):
 class ChatServerUDP:
 
     def __init__(self, ip=localIP, port=localPort):
-        # { "00001": ChatUser('00001'), }
+        # dict: { "00001": ChatUser('00001'), }
         db = ChatDataBase()
         self.users = db.userInfo()
         db.close()
@@ -75,183 +76,216 @@ class ChatServerUDP:
                 print("receiving from: " + str(addr))
                 print("received  data: " + str(data))
 
-                # 发送ACK信息
-                ackHeader = PacketReplyHeader()
-                ackHeader.md5Hash = md5(data).digest()
-                ackHeaderBytes = Struct.pack(ackHeader.struct, ackHeader.headerSize,
-                                             ackHeader.packetSize, ackHeader.msgType, ackHeader.md5Hash)
-                self.sock.sendto(ackHeaderBytes, addr)
-
                 # 新线程处理数据
                 newThread = threading.Thread(
-                    target=UDPDataHandler.ClientDataHandler, args=(data, addr))
+                    target=self.ClientDataHandler, args=(data, addr))
                 newThread.start()
 
             except Exception as e:
                 print()
                 print("ERROR RECEIVING: " + str(e))
 
-
-class UDPDataHandler:
+    ########################################################################################
+    # 处理收到的数据
+    ########################################################################################
 
     def ClientDataHandler(self, data: bytes, addr):
-        header = HeaderBase()
+        header = header_server.HeaderBase()
         headerTuple = Struct.unpack(header.struct, data)
-        header.headerSize, header.packetSize, header.msgType = headerTuple
+        header.headerSize,
+        header.packetSize,
+        header.msgType = headerTuple
 
-        if header.msgType == ClientMsgType.LOGIN_REQUEST.value:
-            pass
+        if header.msgType == header_client.ClientMsgType.LOGIN_REQUEST.value:
+            headerRequest = header_client.LoginRequestHeader()
 
-        elif header.msgType == ClientMsgType.LOGOUT_REQUEST.value:
-            pass
+            if header.headerSize != headerRequest.headerSize or header.packetSize != headerRequest.packetSize:
+                print("PACKET FORMAT ERROR!!!")
+                return
 
-        elif header.msgType == ClientMsgType.CHAT_CONTENT_CLIENT.value:
-            pass
+            headerRequestTuple = Struct.unpack(headerRequest.struct, data)
+            headerRequest.headerSize,
+            headerRequest.packetSize,
+            headerRequest.msgType,
+            headerRequest.thisUserID,
+            headerRequest.password = headerRequestTuple
 
-        elif header.msgType == ClientMsgType.CHAT_REQUEST.value:
-            pass
+            self.LoginRequest(headerRequest, addr)
 
-    def LoginRequest(self, thisUserID: str, password: str, conn: socket):
-        if thisUserID not in self.users.keys():
-            dictToSend = {
-                'msgType': ServerMsgType.LOGIN_REPLY.value,
-                'status': 'error_no_user',
-            }
+        elif header.msgType == header_client.ClientMsgType.LOGOUT_REQUEST.value:
+            headerRequest = header_client.LogoutRequestHeader()
 
-            ''' 
-        elif self.users[thisUserID].loggedIn:
-            dictToSend = {
-                'msgType': ServerMsgType.LOGIN_REPLY.value,
-                'status': 'error_already_logged_in',
-                
-            }
-            '''
+            if header.headerSize != headerRequest.headerSize or header.packetSize != headerRequest.packetSize:
+                print("PACKET FORMAT ERROR!!!")
+                return
 
-        elif password != self.users[thisUserID].password:
-            dictToSend = {
-                'msgType': ServerMsgType.LOGIN_REPLY.value,
-                'status': 'error_wrong_password',
-            }
+            headerRequestTuple = Struct.unpack(headerRequest.struct, data)
+            headerRequest.headerSize,
+            headerRequest.packetSize,
+            headerRequest.msgType,
+            headerRequest.thisUserID = headerRequestTuple
 
-        else:
-            self.users[thisUserID].loggedIn = True
+            self.LogoutRequest(headerRequest, addr)
 
-            dictToSend = {
-                'msgType': ServerMsgType.LOGIN_REPLY.value,
-                'status': 'success',
+        elif header.msgType == header_client.ClientMsgType.CHAT_CONTENT_CLIENT.value:
+            if header.headerSize != header_client.TextMsgHeader().headerSize:
+                print("PACKET FORMAT ERROR!!!")
+                return
 
-                'thisUserID': thisUserID,
-                'password': self.users[thisUserID].password,
-                'nickName': self.users[thisUserID].nickName,
-                'friends': self.users[thisUserID].friends,
-            }
+            self.ChatContent(data, addr)
 
-        bytesToSend = json.dumps(dictToSend).encode("utf-8")
+        elif header.msgType == header_client.ClientMsgType.CHAT_REQUEST.value:
+            headerRequest = header_client.ChatRequestHeader()
 
-        conn.send(bytesToSend)
+            if header.headerSize != headerRequest.headerSize or header.packetSize != headerRequest.packetSize:
+                print("PACKET FORMAT ERROR!!!")
+                return
 
-        print("sent: " + bytesToSend.decode('utf-8'))
-        conn.close()
+            headerRequestTuple = Struct.unpack(headerRequest.struct, data)
+            headerRequest.headerSize,
+            headerRequest.packetSize,
+            headerRequest.msgType,
+            headerRequest.thisUserID = headerRequestTuple
 
-    def LogoutRequest(self, thisUserID: str, conn: socket):
-        if thisUserID not in self.users.keys():
-            dictToSend = {
-                'msgType': ServerMsgType.LOGOUT_REPLY.value,
-                'status': 'error_no_user',
-            }
+            self.ChatRequest(headerRequest, addr)
 
-            '''
-        elif not self.users[thisUserID].loggedIn:
-            dictToSend = {
-                'msgType': ServerMsgType.LOGOUT_REPLY.value,
-                'status': 'error_already_logged_out',
-            }
-            '''
+    def LoginRequest(self, headerRequest: header_client.LoginRequestHeader, addr):
 
-        else:
-            self.users[thisUserID].loggedIn = False
+        headerReply = header_server.LoginReplyHeader()
+        headerReply.loginUserID = headerRequest.thisUserID
+        headerReply.status = header_server.Status.SUCCESS.value
 
-            dictToSend = {
-                'msgType': ServerMsgType.LOGOUT_REPLY.value,
-                'status': 'success',
-            }
+        if headerRequest.thisUserID not in self.users.keys():
+            headerReply.status = header_server.Status.ERROR.value
 
-        bytesToSend = json.dumps(dictToSend).encode("utf-8")
+        # ? elif self.users[headerRequest.thisUserID].loggedIn:
+        # ?    headerReply.status = header_server.Status.ERROR_CONFLICT.value
 
-        conn.send(bytesToSend)
-
-        print("sent: " + bytesToSend.decode('utf-8'))
-        conn.close()
-
-    def ChatContent(self, thisUserID: str, targetUserID: str, contentType: int, content, conn: socket):
-        if targetUserID == 'server':
-            print("SERVER MESSAGE RECEIVE: " + str(content))
-            conn.close()
-            return
-
-        if thisUserID not in self.users.keys():
-            dictToSend = {
-                'msgType': ServerMsgType.LOGIN_REPLY.value,
-                'status': 'error_no_user',
-            }
-
-            bytesToSend = json.dumps(dictToSend).encode("utf-8")
-
-            conn.send(bytesToSend)
-
-            print("sent: " + bytesToSend.decode('utf-8'))
-            conn.close()
-
-        elif not self.users[thisUserID].loggedIn:
-            dictToSend = {
-                'msgType': ServerMsgType.LOGIN_REPLY.value,
-                'status': 'error_not_logged_in',
-            }
-
-            bytesToSend = json.dumps(dictToSend).encode("utf-8")
-
-            conn.send(bytesToSend)
-
-            print("sent: " + bytesToSend.decode('utf-8'))
-            conn.close()
+        elif headerRequest.password != self.users[headerRequest.thisUserID].password:
+            headerReply.status = header_server.Status.ERROR_PASSWORD_WRONG.value
 
         else:
-            dictToAppend = {
-                'fromUserID': thisUserID,
-                'contentType': contentType,
-                'content': content,
-            }
+            headerReply.status = header_server.Status.SUCCESS.value
 
-            self.users[targetUserID].pendingContent.append(dictToAppend)
-            conn.close()
+            # 绑定登录成功用户的UserID和IP地址、端口
+            self.users[headerRequest.thisUserID].loggedIn = True
+            self.users[headerRequest.thisUserID].addr = (addr[0], remotePort)
 
-    def ChatRequest(self, thisUserID: str, conn: socket):
-        if thisUserID not in self.users.keys():
-            dictToSend = {
-                'msgType': ServerMsgType.CHAT_REQUEST_REPLY.value,
-                'hasNewContent': False,
-            }
+        bytesToSend = Struct.pack(headerReply.struct,
+                                  headerReply.headerSize,
+                                  headerReply.packetSize,
+                                  headerReply.msgType,
+                                  headerReply.loginUserID,
+                                  headerReply.status)
 
-        elif len(self.users[thisUserID].pendingContent) == 0:
-            dictToSend = {
-                'msgType': ServerMsgType.CHAT_REQUEST_REPLY.value,
-                'hasNewContent': False,
-            }
+        self.sock.sendto(
+            bytesToSend, self.users[headerRequest.thisUserID].addr)
+        print("sent to: " +
+              self.users[headerRequest.thisUserID].addr + " - " + bytesToSend.decode('utf-8'))
+
+    def LogoutRequest(self, headerRequest: header_client.LogoutRequestHeader, addr):
+
+        headerReply = header_server.LogoutReplyHeader()
+        headerReply.logoutUserID = headerRequest.thisUserID
+        headerReply.status = header_server.Status.SUCCESS.value
+
+        if headerRequest.thisUserID not in self.users.keys():
+            headerReply.status = header_server.Status.ERROR.value
+
+        # ? elif not self.users[headerRequest.thisUserID].loggedIn:
+        # ?    headerReply.status = header_server.Status.ERROR_CONFLICT.value
+
         else:
-            dictToSend = {
-                'msgType': ServerMsgType.CHAT_REQUEST_REPLY.value,
-                'hasNewContent': True,
+            headerReply.status = header_server.Status.SUCCESS.value
 
-                'contentArray': repr(self.users[thisUserID].pendingContent),
-            }
-            self.users[thisUserID].pendingContent.clear()
+            # 解绑用户的UserID和IP地址、端口
+            self.users[headerRequest.thisUserID].loggedIn = False
+            self.users[headerRequest.thisUserID].addr = None
 
-        bytesToSend = json.dumps(dictToSend).encode("utf-8")
+        bytesToSend = Struct.pack(headerReply.struct,
+                                  headerReply.headerSize,
+                                  headerReply.packetSize,
+                                  headerReply.msgType,
+                                  headerReply.logoutUserID,
+                                  headerReply.status)
 
-        conn.send(bytesToSend)
+        self.sock.sendto(
+            bytesToSend, self.users[headerRequest.thisUserID].addr)
+        print("sent to: " +
+              self.users[headerRequest.thisUserID].addr + " - " + bytesToSend.decode('utf-8'))
 
-        print("sent: " + bytesToSend.decode('utf-8'))
-        conn.close()
+    def ChatContent(self, data: bytes, addr):
+        # 发送ACK信息
+        ackHeader = header_server.PacketReplyHeader()
+        ackHeader.md5Hash = md5(data).digest()
+        ackHeaderBytes = Struct.pack(ackHeader.struct,
+                                     ackHeader.headerSize,
+                                     ackHeader.packetSize,
+                                     ackHeader.msgType,
+                                     ackHeader.md5Hash)
+        self.sock.sendto(ackHeaderBytes, (addr[0], remotePort))
+
+        # TEXT消息提交头：尝试解析
+        headerContent = header_client.TextMsgHeader()
+        headerContentTuple = Struct.unpack(headerContent.struct, data)
+        headerContent.contentType = headerContentTuple[5]
+
+        if headerContent.contentType == header_client.ChatContentType.TEXT.value:
+            headerContent.headerSize,
+            headerContent.packetSize,
+            headerContent.msgType,
+            headerContent.fromUserID,
+            headerContent.targetUserID,
+            headerContent.contentType = headerContentTuple
+
+            # todo 处理TEXT信息
+            pass
+
+        # FILE消息提交头：尝试TEXT失败，重新以FILE解包
+        elif headerContent.contentType == header_client.ChatContentType.FILE.value:
+            headerContent = header_client.FileMsgHeader()
+            headerContentTuple = Struct.unpack(headerContent.struct, data)
+
+            headerContent.headerSize,
+            headerContent.packetSize,
+            headerContent.msgType,
+            headerContent.fromUserID,
+            headerContent.targetUserID,
+            headerContent.contentType,
+            headerContent.packetCountTotal,
+            headerContent.packetCountCurrent = headerContentTuple
+
+            # todo 处理FILE信息
+            pass
+
+    def ChatRequest(self, headerRequest: header_client.ChatRequestHeader, addr):
+        headerReply = header_server.ChatRequestReplyHeader()
+        headerReply.thisUserID = headerRequest.thisUserID
+
+        if headerReply.thisUserID not in self.users.keys():
+            headerReply.pendingMsgTotalCount = 0
+
+        else:
+            pendingMsg = self.users[headerRequest.thisUserID].pendingTextMsg
+
+            headerReply.pendingMsgTotalCount = len(pendingMsg)
+
+            # todo: 客户端添加ACK回包确认收到了所有消息
+            self.users[headerReply.thisUserID].pendingContent.clear()
+
+        # todo: 将具体的包信息打包进去
+
+        bytesToSend = Struct.pack(headerReply.struct,
+                                  headerReply.headerSize,
+                                  headerReply.packetSize,
+                                  headerReply.msgType,
+                                  headerReply.thisUserID,
+                                  headerReply.pendingMsgTotalCount)
+
+        # todo: 支持多客户端登录同一账号
+        self.sock.sendto(bytesToSend, (addr[0], remotePort))
+        print("sent to: " +
+              self.users[headerRequest.thisUserID].addr + " - " + bytesToSend.decode('utf-8'))
 
 
 if __name__ == "__main__":

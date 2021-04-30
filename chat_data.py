@@ -3,7 +3,7 @@ from sqlite3.dbapi2 import Cursor
 
 
 class ChatUser:
-    def __init__(self, id: str, password: str, nickName: str, friends: list):
+    def __init__(self, id: int, password: str, nickName: str, friends: list):
         # 用户号码
         self.id = id
 
@@ -13,21 +13,24 @@ class ChatUser:
         # 昵称
         self.nickName = nickName
 
-        # 好友列表 list:[str,]
+        # 好友列表 list:[int,]
         self.friends = friends
 
         # 登录状态
         self.loggedIn = False
 
+        # IP地址和端口
+        self.addr = None  # ("0.0.0.0", 0)
+
         # 新消息暂存区
-        self.pendingContent = [
+        self.pendingTextMsg = [
 
         ]
 
 
 '''
 class ChatGroup:
-    def __init__(self, groupID: str):
+    def __init__(self, groupID: int):
         # 群组编号
         self.id = groupID
 
@@ -54,7 +57,7 @@ class ChatDataBase:
         self.cursor = self.conn.cursor()
         try:
             self.cursor.execute("CREATE TABLE user \
-                                (ID             TEXT PRIMARY KEY    NOT NULL, \
+                                (ID             INT PRIMARY KEY     NOT NULL, \
                                  PASSWORD       TEXT                NOT NULL, \
                                  NICKNAME       TEXT                NOT NULL \
                                  )")
@@ -64,8 +67,8 @@ class ChatDataBase:
         try:
             self.cursor.execute('CREATE TABLE friends \
                                 (PAIRID         INT PRIMARY KEY     NOT NULL, \
-                                 THISID         TEXT                NOT NULL, \
-                                 THATID         TEXT                NOT NULL \
+                                 THISID         INT                 NOT NULL, \
+                                 THATID         INT                 NOT NULL \
                                  )')
         except Exception as e:
             print(e)
@@ -77,7 +80,7 @@ class ChatDataBase:
         self.conn = sqlite3.connect(self.dbName, timeout=2.0)
         self.cursor = self.conn.cursor()
         self.cursor.execute("INSERT INTO user (ID, PASSWORD, NICKNAME) \
-                             VALUES ('%s', '%s', '%s')" % (id, password, nickName))
+                             VALUES ('%d', '%s', '%s')" % (id, password, nickName))
 
         curFriends = self.cursor.execute("SELECT PAIRID FROM friends")
         cntFriendsPair = 0
@@ -87,9 +90,9 @@ class ChatDataBase:
         for f in friends:
             cntFriendsPair += 1
             self.cursor.execute("INSERT INTO friends (PAIRID, THISID, THATID)  \
-                                 VALUES ('%d', '%s', '%s')" % (cntFriendsPair, id, f))
+                                 VALUES ('%d', '%d', '%d')" % (cntFriendsPair, id, f))
             print("INSERT INTO friends (PAIRID, THISID, THATID)  \
-                                 VALUES ('%d', '%s', '%s')" % (cntFriendsPair, id, f))
+                                 VALUES ('%d', '%d', '%d')" % (cntFriendsPair, id, f))
             '''
             cntFriendsPair += 1
             self.cursor.execute("INSERT INTO friends (PAIRID, THATID, THISID)  \
@@ -131,10 +134,10 @@ if __name__ == "__main__":
 
     db = ChatDataBase()
     db.initializeFile()
-    db.addUser('00001', 'liangleya', '凉了呀', ['00000', '00002', '00003'])
-    db.addUser('00002', '00002_pswd', '00002', ['00000', '00001'])
-    db.addUser('00003', '00003_pswd', '00003', ['00000', '00001'])
-    db.addUser('00000', '00000', '服务器', [])
+    db.addUser(1, 'liangleya', '凉了呀', [0, 2, 3])
+    db.addUser(2, '00002_pswd', '00002', [0, 1])
+    db.addUser(3, '00003_pswd', '00003', [0, 1])
+    db.addUser(0, '00000', '服务器', [])
     db.close()
 
     db = ChatDataBase()
