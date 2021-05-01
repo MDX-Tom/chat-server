@@ -12,15 +12,16 @@ class ChatContentType(Enum):
 
 
 class ServerMsgType(Enum):
-    MSG_SERVER_ACK = 1,  # Reliable UDP
+    MSG_SERVER_ACK = 11,  # Reliable UDP
 
-    CHAT_CONTENT_SERVER = 0,
-    LOGIN_REPLY = 2, LOGOUT_REPLY = 3,
-    CHAT_REQUEST_REPLY = 99
+    CHAT_CONTENT_SERVER = 21,
+    LOGIN_REPLY = 31, LOGOUT_REPLY = 41,
+
+    CHAT_REQUEST_REPLY = 101
 
 
 class Status(Enum):
-    SUCCESS = 1,
+    SUCCESS = 10,
 
     ERROR_PASSWORD_WRONG = 10,
     ERROR_CONFLICT = 11,  # 重复操作
@@ -35,7 +36,7 @@ class Status(Enum):
 
 class HeaderBase:
     def __init__(self):
-        self.struct = "!HHB"
+        self.struct = "@HHB"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -58,7 +59,7 @@ class HeaderBase:
 
 class PacketReplyHeader:
     def __init__(self):
-        self.struct = "!HHB16s"
+        self.struct = "@HHB16s"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -85,7 +86,7 @@ class PacketReplyHeader:
 
 class LoginReplyHeader:
     def __init__(self):
-        self.struct = "!HHBHB"
+        self.struct = "@HHBHB"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -114,7 +115,7 @@ class LoginReplyHeader:
 
 class LogoutReplyHeader:
     def __init__(self):
-        self.struct = "!HHBHB"
+        self.struct = "@HHBHB"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -143,7 +144,7 @@ class LogoutReplyHeader:
 
 class ChatRequestReplyHeader:
     def __init__(self):
-        self.struct = "!HHBHH"
+        self.struct = "@HHBHH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize

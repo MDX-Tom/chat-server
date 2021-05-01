@@ -9,11 +9,12 @@ from header_server import ChatContentType, Status, HeaderBase
 
 
 class ClientMsgType(Enum):
-    MSG_CLIENT_ACK = 1,  # Reliable UDP
+    MSG_CLIENT_ACK = 10,  # Reliable UDP
 
-    CHAT_CONTENT_CLIENT = 0,
-    LOGIN_REQUEST = 2, LOGOUT_REQUEST = 3,
-    CHAT_REQUEST = 99,
+    CHAT_CONTENT_CLIENT = 20,
+    LOGIN_REQUEST = 30, LOGOUT_REQUEST = 40,
+
+    CHAT_REQUEST = 100,
 
 
 ########################################################################
@@ -23,7 +24,7 @@ class ClientMsgType(Enum):
 
 class LoginRequestHeader:
     def __init__(self):
-        self.struct = "!HHBH25s"
+        self.struct = "@HHBH25s"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -52,7 +53,7 @@ class LoginRequestHeader:
 
 class LogoutRequestHeader:
     def __init__(self):
-        self.struct = "!HHBH"
+        self.struct = "@HHBH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -79,7 +80,7 @@ class LogoutRequestHeader:
 
 class TextMsgHeader:
     def __init__(self):
-        self.struct = "!HHBHHB"
+        self.struct = "@HHBHHB"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -110,7 +111,7 @@ class TextMsgHeader:
 
 class FileMsgHeader:
     def __init__(self):
-        self.struct = "!HHBHHBII"
+        self.struct = "@HHBHHBII"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -148,7 +149,7 @@ class FileMsgHeader:
 
 class ChatRequestHeader:
     def __init__(self):
-        self.struct = "!HHBH"
+        self.struct = "@HHBH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
