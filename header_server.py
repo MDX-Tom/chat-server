@@ -12,19 +12,20 @@ class ChatContentType(Enum):
 
 
 class ServerMsgType(Enum):
-    MSG_SERVER_ACK = 11,  # Reliable UDP
+    MSG_SERVER_ACK = 11  # Reliable UDP
 
-    CHAT_CONTENT_SERVER = 21,
-    LOGIN_REPLY = 31, LOGOUT_REPLY = 41,
+    CHAT_CONTENT_SERVER = 21
+    LOGIN_REPLY = 31
+    LOGOUT_REPLY = 41
 
     CHAT_REQUEST_REPLY = 101
 
 
 class Status(Enum):
-    SUCCESS = 10,
+    SUCCESS = 10
 
-    ERROR_PASSWORD_WRONG = 10,
-    ERROR_CONFLICT = 11,  # 重复操作
+    ERROR_PASSWORD_WRONG = 10
+    ERROR_CONFLICT = 11  # 重复操作
 
     ERROR = 99
 

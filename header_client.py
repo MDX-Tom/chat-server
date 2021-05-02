@@ -9,12 +9,13 @@ from header_server import ChatContentType, Status, HeaderBase
 
 
 class ClientMsgType(Enum):
-    MSG_CLIENT_ACK = 10,  # Reliable UDP
+    MSG_CLIENT_ACK = 10  # Reliable UDP
 
-    CHAT_CONTENT_CLIENT = 20,
-    LOGIN_REQUEST = 30, LOGOUT_REQUEST = 40,
+    CHAT_CONTENT_CLIENT = 20
+    LOGIN_REQUEST = 30
+    LOGOUT_REQUEST = 40
 
-    CHAT_REQUEST = 100,
+    CHAT_REQUEST = 100
 
 
 ########################################################################
