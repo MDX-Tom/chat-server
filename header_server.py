@@ -86,7 +86,7 @@ class PacketReplyHeader:
 
 class LoginReplyHeader:
     def __init__(self):
-        self.struct = "@HHBHB"
+        self.struct = "@HHBHBH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -94,6 +94,8 @@ class LoginReplyHeader:
 
         self.loginUserID = 0
         self.status = Status.ERROR.value
+
+        self.friendCount = 0
 
 
 '''
@@ -105,6 +107,8 @@ class LoginReplyHeader:
 
         quint16 loginUserID;
         quint8 status;
+        
+        quint16 friendCount;
     };
 '''
 
