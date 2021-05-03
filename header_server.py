@@ -37,7 +37,7 @@ class Status(Enum):
 
 class HeaderBase:
     def __init__(self):
-        self.struct = "@HHB"
+        self.struct = "@HHH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -60,7 +60,7 @@ class HeaderBase:
 
 class PacketReplyHeader:
     def __init__(self):
-        self.struct = "@HHB16s"
+        self.struct = "@HHH16s"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -120,7 +120,7 @@ class LoginReplyHeader:
 
 class LogoutReplyHeader:
     def __init__(self):
-        self.struct = "@HHBHB"
+        self.struct = "@HHBHH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize

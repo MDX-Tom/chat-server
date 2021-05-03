@@ -159,9 +159,7 @@ class ChatServerUDP:
         headerReply = header_server.LoginReplyHeader()
         headerReply.loginUserID = headerRequest.thisUserID
         headerReply.status = header_server.Status.SUCCESS.value
-
-        password = self.users[headerRequest.thisUserID].password.ljust(
-            len(headerRequest.password), '\x00')
+        bytesFriends = bytes()
 
         if headerRequest.thisUserID not in self.users.keys():
             headerReply.status = header_server.Status.ERROR.value
@@ -169,7 +167,8 @@ class ChatServerUDP:
         # ? elif self.users[headerRequest.thisUserID].loggedIn:
         # ?    headerReply.status = header_server.Status.ERROR_CONFLICT.value
 
-        elif headerRequest.password != password:
+        elif headerRequest.password != self.users[headerRequest.thisUserID].password.ljust(
+                len(headerRequest.password), '\x00'):
             headerReply.status = header_server.Status.ERROR_PASSWORD_WRONG.value
 
         else:
@@ -181,6 +180,9 @@ class ChatServerUDP:
             headerReply.friendCount = len(
                 self.users[headerRequest.thisUserID].friends)
 
+            for id in self.users[headerRequest.thisUserID].friends:
+                bytesFriends += struct.pack("@H", id)
+
         bytesToSend = struct.pack(headerReply.struct,
                                   headerReply.headerSize,
                                   headerReply.packetSize,
@@ -188,8 +190,7 @@ class ChatServerUDP:
                                   headerReply.loginUserID,
                                   headerReply.status,
                                   headerReply.friendCount)
-
-        # todo: 传输好友列表
+        bytesToSend = bytesToSend + bytesFriends
 
         self.sock.sendto(
             bytesToSend, (addr[0], remotePort))
@@ -238,6 +239,7 @@ class ChatServerUDP:
                                      ackHeader.msgType,
                                      ackHeader.md5Hash)
         self.sock.sendto(ackHeaderBytes, (addr[0], remotePort))
+        print("sent ACK MESSAGE to: " + str((addr[0], remotePort)))
 
         # TEXT消息提交头：尝试解析
         headerContent = header_client.TextMsgHeader()
