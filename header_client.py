@@ -25,7 +25,7 @@ class ClientMsgType(Enum):
 
 class LoginRequestHeader:
     def __init__(self):
-        self.struct = "@HHBH25s"
+        self.struct = "@HHBH28s"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize

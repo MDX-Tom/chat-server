@@ -22,7 +22,7 @@ class ServerMsgType(Enum):
 
 
 class Status(Enum):
-    SUCCESS = 10
+    SUCCESS = 1
 
     ERROR_PASSWORD_WRONG = 10
     ERROR_CONFLICT = 11  # 重复操作

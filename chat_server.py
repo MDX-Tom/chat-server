@@ -4,7 +4,7 @@
 
 import socket
 import threading
-from struct import Struct
+import struct
 import zlib
 import hashlib
 
@@ -12,7 +12,7 @@ from chat_data import *
 import header_server
 import header_client
 
-localIP = "192.168.3.131"
+localIP = "0.0.0.0"
 localPort = 8002
 remotePort = 8002
 udpBufferSize = 1024
@@ -91,10 +91,10 @@ class ChatServerUDP:
 
     def ClientDataHandler(self, data: bytes, addr):
         header = header_server.HeaderBase()
-        headerTuple = Struct.unpack(header.struct, data)
-        header.headerSize,
-        header.packetSize,
-        header.msgType = headerTuple
+        headerTuple = struct.unpack(header.struct, data[0:header.headerSize])
+        header.headerSize, \
+            header.packetSize, \
+            header.msgType = headerTuple
 
         if header.msgType == header_client.ClientMsgType.LOGIN_REQUEST.value:
             headerRequest = header_client.LoginRequestHeader()
@@ -103,12 +103,15 @@ class ChatServerUDP:
                 print("PACKET FORMAT ERROR!!!")
                 return
 
-            headerRequestTuple = Struct.unpack(headerRequest.struct, data)
-            headerRequest.headerSize,
-            headerRequest.packetSize,
-            headerRequest.msgType,
-            headerRequest.thisUserID,
-            headerRequest.password = headerRequestTuple
+            headerRequestTuple = struct.unpack(
+                headerRequest.struct, data[0:headerRequest.headerSize])
+            headerRequest.headerSize, \
+                headerRequest.packetSize, \
+                headerRequest.msgType, \
+                headerRequest.thisUserID, \
+                headerRequest.password = headerRequestTuple
+
+            headerRequest.password = headerRequest.password.decode("utf-8")
 
             self.LoginRequest(headerRequest, addr)
 
@@ -119,11 +122,12 @@ class ChatServerUDP:
                 print("PACKET FORMAT ERROR!!!")
                 return
 
-            headerRequestTuple = Struct.unpack(headerRequest.struct, data)
-            headerRequest.headerSize,
-            headerRequest.packetSize,
-            headerRequest.msgType,
-            headerRequest.thisUserID = headerRequestTuple
+            headerRequestTuple = struct.unpack(
+                headerRequest.struct, data[0:headerRequest.headerSize])
+            headerRequest.headerSize, \
+                headerRequest.packetSize, \
+                headerRequest.msgType, \
+                headerRequest.thisUserID = headerRequestTuple
 
             self.LogoutRequest(headerRequest, addr)
 
@@ -141,11 +145,12 @@ class ChatServerUDP:
                 print("PACKET FORMAT ERROR!!!")
                 return
 
-            headerRequestTuple = Struct.unpack(headerRequest.struct, data)
-            headerRequest.headerSize,
-            headerRequest.packetSize,
-            headerRequest.msgType,
-            headerRequest.thisUserID = headerRequestTuple
+            headerRequestTuple = struct.unpack(
+                headerRequest.struct, data[0:headerRequest.headerSize])
+            headerRequest.headerSize, \
+                headerRequest.packetSize, \
+                headerRequest.msgType, \
+                headerRequest.thisUserID = headerRequestTuple
 
             self.ChatRequest(headerRequest, addr)
 
@@ -155,13 +160,16 @@ class ChatServerUDP:
         headerReply.loginUserID = headerRequest.thisUserID
         headerReply.status = header_server.Status.SUCCESS.value
 
+        password = self.users[headerRequest.thisUserID].password.ljust(
+            len(headerRequest.password), '\x00')
+
         if headerRequest.thisUserID not in self.users.keys():
             headerReply.status = header_server.Status.ERROR.value
 
         # ? elif self.users[headerRequest.thisUserID].loggedIn:
         # ?    headerReply.status = header_server.Status.ERROR_CONFLICT.value
 
-        elif headerRequest.password != self.users[headerRequest.thisUserID].password:
+        elif headerRequest.password != password:
             headerReply.status = header_server.Status.ERROR_PASSWORD_WRONG.value
 
         else:
@@ -170,18 +178,23 @@ class ChatServerUDP:
             # 绑定登录成功用户的UserID和IP地址、端口
             self.users[headerRequest.thisUserID].loggedIn = True
             self.users[headerRequest.thisUserID].addr = (addr[0], remotePort)
+            headerReply.friendCount = len(
+                self.users[headerRequest.thisUserID].friends)
 
-        bytesToSend = Struct.pack(headerReply.struct,
+        bytesToSend = struct.pack(headerReply.struct,
                                   headerReply.headerSize,
                                   headerReply.packetSize,
                                   headerReply.msgType,
                                   headerReply.loginUserID,
-                                  headerReply.status)
+                                  headerReply.status,
+                                  headerReply.friendCount)
+
+        # todo: 传输好友列表
 
         self.sock.sendto(
-            bytesToSend, self.users[headerRequest.thisUserID].addr)
+            bytesToSend, (addr[0], remotePort))
         print("sent to: " +
-              self.users[headerRequest.thisUserID].addr + " - " + bytesToSend.decode('utf-8'))
+              str((addr[0], remotePort)) + " - " + str(bytesToSend))
 
     def LogoutRequest(self, headerRequest: header_client.LogoutRequestHeader, addr):
 
@@ -201,8 +214,9 @@ class ChatServerUDP:
             # 解绑用户的UserID和IP地址、端口
             self.users[headerRequest.thisUserID].loggedIn = False
             self.users[headerRequest.thisUserID].addr = None
+            # todo: 支持多客户端登陆
 
-        bytesToSend = Struct.pack(headerReply.struct,
+        bytesToSend = struct.pack(headerReply.struct,
                                   headerReply.headerSize,
                                   headerReply.packetSize,
                                   headerReply.msgType,
@@ -210,15 +224,15 @@ class ChatServerUDP:
                                   headerReply.status)
 
         self.sock.sendto(
-            bytesToSend, self.users[headerRequest.thisUserID].addr)
+            bytesToSend, (addr[0], remotePort))
         print("sent to: " +
-              self.users[headerRequest.thisUserID].addr + " - " + bytesToSend.decode('utf-8'))
+              str((addr[0], remotePort)) + " - " + str(bytesToSend))
 
     def ChatContent(self, data: bytes, addr):
         # 发送ACK信息
         ackHeader = header_server.PacketReplyHeader()
         ackHeader.md5Hash = md5(data).digest()
-        ackHeaderBytes = Struct.pack(ackHeader.struct,
+        ackHeaderBytes = struct.pack(ackHeader.struct,
                                      ackHeader.headerSize,
                                      ackHeader.packetSize,
                                      ackHeader.msgType,
@@ -227,16 +241,17 @@ class ChatServerUDP:
 
         # TEXT消息提交头：尝试解析
         headerContent = header_client.TextMsgHeader()
-        headerContentTuple = Struct.unpack(headerContent.struct, data)
+        headerContentTuple = struct.unpack(
+            headerContent.struct, data[0:headerContent.headerSize])
         headerContent.contentType = headerContentTuple[5]
 
         if headerContent.contentType == header_client.ChatContentType.TEXT.value:
-            headerContent.headerSize,
-            headerContent.packetSize,
-            headerContent.msgType,
-            headerContent.fromUserID,
-            headerContent.targetUserID,
-            headerContent.contentType = headerContentTuple
+            headerContent.headerSize, \
+                headerContent.packetSize, \
+                headerContent.msgType, \
+                headerContent.fromUserID, \
+                headerContent.targetUserID, \
+                headerContent.contentType = headerContentTuple
 
             # todo 处理TEXT信息
             pass
@@ -244,16 +259,17 @@ class ChatServerUDP:
         # FILE消息提交头：尝试TEXT失败，重新以FILE解包
         elif headerContent.contentType == header_client.ChatContentType.FILE.value:
             headerContent = header_client.FileMsgHeader()
-            headerContentTuple = Struct.unpack(headerContent.struct, data)
+            headerContentTuple = struct.unpack(
+                headerContent.struct, data[0:headerContent.headerSize])
 
-            headerContent.headerSize,
-            headerContent.packetSize,
-            headerContent.msgType,
-            headerContent.fromUserID,
-            headerContent.targetUserID,
-            headerContent.contentType,
-            headerContent.packetCountTotal,
-            headerContent.packetCountCurrent = headerContentTuple
+            headerContent.headerSize, \
+                headerContent.packetSize, \
+                headerContent.msgType, \
+                headerContent.fromUserID, \
+                headerContent.targetUserID, \
+                headerContent.contentType, \
+                headerContent.packetCountTotal, \
+                headerContent.packetCountCurrent = headerContentTuple
 
             # todo 处理FILE信息
             pass
@@ -271,11 +287,11 @@ class ChatServerUDP:
             headerReply.pendingMsgTotalCount = len(pendingMsg)
 
             # todo: 客户端添加ACK回包确认收到了所有消息
-            self.users[headerReply.thisUserID].pendingContent.clear()
+            self.users[headerReply.thisUserID].pendingTextMsg.clear()
 
         # todo: 将具体的包信息打包进去
 
-        bytesToSend = Struct.pack(headerReply.struct,
+        bytesToSend = struct.pack(headerReply.struct,
                                   headerReply.headerSize,
                                   headerReply.packetSize,
                                   headerReply.msgType,
@@ -285,9 +301,9 @@ class ChatServerUDP:
         # todo: 支持多客户端登录同一账号
         self.sock.sendto(bytesToSend, (addr[0], remotePort))
         print("sent to: " +
-              self.users[headerRequest.thisUserID].addr + " - " + bytesToSend.decode('utf-8'))
+              str((addr[0], remotePort)) + " - " + str(bytesToSend))
 
 
 if __name__ == "__main__":
-    tcp = ChatServerUDP(localIP)
-    tcp.open()
+    udp = ChatServerUDP(localIP)
+    udp.open()
