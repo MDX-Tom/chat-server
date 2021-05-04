@@ -15,7 +15,7 @@ import header_client
 localIP = "0.0.0.0"
 localPort = 8002
 remotePort = 8002
-udpBufferSize = 1024
+udpBufferSize = 65536
 
 
 def crc32(bytes):
@@ -41,7 +41,10 @@ class ChatServerUDP:
         self.ip, self.port = ip, port
 
         # IPv4 UDP
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, )
+        print(self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF))
+        self.sock.setsockopt(
+            socket.SOL_SOCKET, socket.SO_SNDBUF, udpBufferSize)
 
         # 监听地址和端口
         self.sock.bind((ip, port))
@@ -91,6 +94,9 @@ class ChatServerUDP:
 
     def ClientDataHandler(self, data: bytes, addr):
         header = header_server.HeaderBase()
+        if len(data) < header.headerSize:
+            print("IGNORE EMPTY DATAGRAM...")
+            return
         headerTuple = struct.unpack(header.struct, data[0:header.headerSize])
         header.headerSize, \
             header.packetSize, \
@@ -132,7 +138,8 @@ class ChatServerUDP:
             self.LogoutRequest(headerRequest, addr)
 
         elif header.msgType == header_client.ClientMsgType.CHAT_CONTENT_CLIENT.value:
-            if header.headerSize != header_client.TextMsgHeader().headerSize:
+            if header.headerSize != header_client.TextMsgHeader().headerSize and \
+                    header.headerSize != header_client.FileMsgHeader().headerSize:
                 print("PACKET FORMAT ERROR!!!")
                 return
 
