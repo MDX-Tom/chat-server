@@ -55,6 +55,9 @@ class ChatServerUDP:
         self.listenThread = threading.Thread(target=self.waitForData)
         self.listenThread.start()
 
+        # FILE暂存
+        self.fileDict = {}
+
     def open(self):
         """启动监听"""
         print()
@@ -262,8 +265,28 @@ class ChatServerUDP:
                 headerContent.targetUserID, \
                 headerContent.contentType = headerContentTuple
 
-            # todo 处理TEXT信息
-            pass
+            textSize = headerContent.packetSize - headerContent.headerSize
+            structText = "@" + str(textSize) + "s"  # no alignment needed!
+            textBytes = struct.unpack(
+                structText, data[headerContent.headerSize:len(data)])[0]
+            textStr = str(textBytes, encoding="utf-8")
+
+            # 处理TEXT信息
+            if headerContent.targetUserID == 0:
+                # message to server
+                print("SERVER RECEIVE MESSAGE: " + textStr)
+
+            else:
+                if headerContent.targetUserID not in self.users.keys():
+                    print("Text msg from: " + str(headerContent.fromUserID) +
+                          " to: " + str(headerContent.targetUserID) + " (TARGET USER NOT DEFINED!)")
+                    return
+
+                # todo: 装入暂存区
+                self.users[headerContent.targetUserID].pendingTextMsg.append()
+
+                print("Text msg from: " + str(headerContent.fromUserID) +
+                      " to: " + str(headerContent.targetUserID) + "...")
 
         # FILE消息提交头：尝试TEXT失败，重新以FILE解包
         elif headerContent.contentType == header_client.ChatContentType.FILE.value:
@@ -277,11 +300,45 @@ class ChatServerUDP:
                 headerContent.fromUserID, \
                 headerContent.targetUserID, \
                 headerContent.contentType, \
+                headerContent.fileNameLength, \
                 headerContent.packetCountTotal, \
                 headerContent.packetCountCurrent = headerContentTuple
 
-            # todo 处理FILE信息
-            pass
+            # 紧跟Header是文件名
+            structFileName = "@" + str(headerContent.fileNameLength) + "s"
+            fileNameBytes = struct.unpack(
+                structFileName, data[headerContent.headerSize:headerContent.headerSize + headerContent.fileNameLength])[0]
+            fileNameStr = str(fileNameBytes, encoding="utf-8")
+
+            # 文件名后面直到包结尾是文件分片的Bytes
+            fragmentLength = headerContent.packetSize - \
+                headerContent.fileNameLength - headerContent.headerSize
+            structFragment = "@" + str(fragmentLength) + "s"
+            fragmentBytes = struct.unpack(
+                structFragment, data[headerContent.headerSize + headerContent.fileNameLength:len(data)])[0]
+
+            # 在内存中暂存分片信息
+            if headerContent.packetCountCurrent == 0:
+                # 文件名防冲突
+                fileRename = 1
+                while fileNameStr in self.fileDict.keys():
+                    fileNameStr += "(" + str(fileRename) + ")"
+                    fileRename += 1
+
+                print("New File: " + fileNameStr)
+                self.fileDict[fileNameStr] = {}
+                # todo 创建文件
+
+            self.fileDict[fileNameStr][headerContent.packetCountCurrent] = fragmentBytes
+
+            # 传输完成
+            # ! 需要发送端逐个发送，或至少保证最后一个包最后发送
+            if headerContent.packetCountCurrent == headerContent.packetCountTotal - 1:
+                # todo 储存文件
+
+                # todo 删除内存暂存区
+
+                pass
 
     def ChatRequest(self, headerRequest: header_client.ChatRequestHeader, addr):
         headerReply = header_server.ChatRequestReplyHeader()

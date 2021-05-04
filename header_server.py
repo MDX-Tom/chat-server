@@ -170,3 +170,39 @@ class ChatRequestReplyHeader:
         quint16 pendingMsgTotalCount;
     };
 '''
+
+########################################################################
+# CHAT CONTENT SERVER
+########################################################################
+
+
+class ChatContentServerHeader:
+    #! 不支持使用HeaderBase解析！！！
+
+    def __init__(self):
+        self.struct = "@HHBBHHH"
+
+        self.headerSize = calcsize(self.struct)
+        self.currentPacketSize = self.headerSize
+        self.msgType = ServerMsgType.CHAT_CONTENT_SERVER.value
+        self.contentType = ChatContentType.TEXT.value
+
+        self.fromUserID = 0
+        self.pendingMsgTotalCount = 0
+        self.currentMsgCount = 0
+
+
+'''
+    struct ChatContentServerHeader
+    {
+        // 为ChatRequestReplyHeader的次级Header
+        const quint16 headerSize = sizeof(ChatContentServerHeader);
+        quint16 currentPacketSize;
+        const quint8 msgType = ServerMsgType::CHAT_CONTENT_SERVER;
+        quint8 contentType = ChatContentType::TEXT;
+
+        quint16 fromUserID;
+        quint16 pendingMsgTotalCount;
+        quint16 currentMsgCount;
+    };
+'''

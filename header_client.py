@@ -112,7 +112,7 @@ class TextMsgHeader:
 
 class FileMsgHeader:
     def __init__(self):
-        self.struct = "@HHBHHBII"
+        self.struct = "@HHBHHBBII"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -122,8 +122,10 @@ class FileMsgHeader:
         self.targetUserID = 0
         self.contentType = ChatContentType.FILE.value
 
+        self.fileNameLength = 0
+
         self.packetCountTotal = 1
-        self.packetCountCurrent = 1
+        self.packetCountCurrent = 0  # ! Starts from 0.
 
 
 '''
@@ -137,9 +139,13 @@ class FileMsgHeader:
         quint16 targetUserID;
         quint8 contentType = ChatContentType::FILE;
 
+        quint8 fileNameLength;
+
         // 分包信息
         quint32 packetCountTotal;
         quint32 packetCountCurrent;
+        
+        
     };
 '''
 
