@@ -7,6 +7,7 @@ import threading
 import struct
 import zlib
 import hashlib
+import os
 
 from chat_data import *
 import header_server
@@ -56,7 +57,8 @@ class ChatServerUDP:
         self.listenThread.start()
 
         # FILE暂存
-        self.fileDict = {}
+        self.fileDict = {}  # 暂存文件分片
+        self.file = {}  # 暂存file.open对象
 
     def open(self):
         """启动监听"""
@@ -325,20 +327,38 @@ class ChatServerUDP:
                     fileNameStr += "(" + str(fileRename) + ")"
                     fileRename += 1
 
+                # 创建文件
                 print("New File: " + fileNameStr)
                 self.fileDict[fileNameStr] = {}
-                # todo 创建文件
+                self.file[fileNameStr] = open("./" + os.path.splitext(fileNameStr)
+                                              [0] + "/" + fileNameStr,
+                                              mode="ab")
 
             self.fileDict[fileNameStr][headerContent.packetCountCurrent] = fragmentBytes
 
             # 传输完成
             # ! 需要发送端逐个发送，或至少保证最后一个包最后发送
             if headerContent.packetCountCurrent == headerContent.packetCountTotal - 1:
-                # todo 储存文件
+                # 储存文件
+                fileValid = True
+                for i in range(headerContent.packetCountTotal):
+                    if i not in self.fileDict[fileNameStr].keys():
+                        # 文件不完整
+                        fileValid = False
+                        break
 
-                # todo 删除内存暂存区
+                    self.file[fileNameStr].write(self.fileDict[fileNameStr][i])
 
-                pass
+                if fileValid:
+                    print("FILE: " + fileNameStr + " RECV SUCCESS!")
+                else:
+                    print("FILE: " + fileNameStr + " RECV FAILED!")
+
+                # 删除内存暂存区
+                # ? 需要如何才能更好地防文件名冲突？
+                self.file[fileNameStr].close()
+                self.file[fileNameStr] = "FILE WRITTEN!"
+                self.fileDict[fileNameStr] = "FILE WRITTEN!"
 
     def ChatRequest(self, headerRequest: header_client.ChatRequestHeader, addr):
         headerReply = header_server.ChatRequestReplyHeader()
