@@ -81,7 +81,7 @@ class LogoutRequestHeader:
 
 class TextMsgHeader:
     def __init__(self):
-        self.struct = "@HHBHHH"
+        self.struct = "@HHBHHBB"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize

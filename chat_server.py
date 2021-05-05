@@ -43,9 +43,10 @@ class ChatServerUDP:
 
         # IPv4 UDP
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, )
-        print(self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF))
         self.sock.setsockopt(
             socket.SOL_SOCKET, socket.SO_SNDBUF, udpBufferSize)
+        print("UDP Buffer Size: " +
+              str(self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF)))
 
         # 监听地址和端口
         self.sock.bind((ip, port))
@@ -323,16 +324,18 @@ class ChatServerUDP:
             if headerContent.packetCountCurrent == 0:
                 # 文件名防冲突
                 fileRename = 1
-                while fileNameStr in self.fileDict.keys():
+                if not os.path.exists("./Received/"):
+                    os.mkdir("./Received/")
+                while fileNameStr in self.fileDict.keys() or os.path.exists("./Received/" + fileNameStr):
                     fileNameStr += "(" + str(fileRename) + ")"
                     fileRename += 1
 
                 # 创建文件
                 print("New File: " + fileNameStr)
+
                 self.fileDict[fileNameStr] = {}
-                self.file[fileNameStr] = open("./" + os.path.splitext(fileNameStr)
-                                              [0] + "/" + fileNameStr,
-                                              mode="ab")
+                self.file[fileNameStr] = open(
+                    "./Received/" + fileNameStr, mode="ab")
 
             self.fileDict[fileNameStr][headerContent.packetCountCurrent] = fragmentBytes
 
