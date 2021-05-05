@@ -324,11 +324,13 @@ class ChatServerUDP:
             if headerContent.packetCountCurrent == 0:
                 # 文件名防冲突
                 fileRename = 1
+                fileNameRename = fileNameStr
                 if not os.path.exists("./Received/"):
                     os.mkdir("./Received/")
-                while fileNameStr in self.fileDict.keys() or os.path.exists("./Received/" + fileNameStr):
-                    fileNameStr += "(" + str(fileRename) + ")"
+                while fileNameRename in self.fileDict.keys() or os.path.exists("./Received/" + fileNameRename):
+                    fileNameRename = fileNameStr + "(" + str(fileRename) + ")"
                     fileRename += 1
+                fileNameStr = fileNameRename
 
                 # 创建文件
                 print("New File: " + fileNameStr)
@@ -336,6 +338,8 @@ class ChatServerUDP:
                 self.fileDict[fileNameStr] = {}
                 self.file[fileNameStr] = open(
                     "./Received/" + fileNameStr, mode="ab")
+
+            # ! BUG: 重复接收文件时，其他的包也需要修改文件名！
 
             self.fileDict[fileNameStr][headerContent.packetCountCurrent] = fragmentBytes
 
