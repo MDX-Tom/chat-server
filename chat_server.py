@@ -15,8 +15,8 @@ import header_client
 
 localIP = "0.0.0.0"
 localPort = 8002
-remotePort = 8002
-udpBufferSize = 65536
+remotePort = 8003
+udpBufferSize = 1000000000
 
 
 def crc32(bytes):
@@ -42,7 +42,7 @@ class ChatServerUDP:
         self.ip, self.port = ip, port
 
         # IPv4 UDP
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, )
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(
             socket.SOL_SOCKET, socket.SO_SNDBUF, udpBufferSize)
         print("UDP Buffer Size: " +
@@ -79,20 +79,22 @@ class ChatServerUDP:
         while True:
             self.listenEvent.wait()
 
-            try:
-                data, addr = self.sock.recvfrom(udpBufferSize)
-                print()
-                print("receiving from: " + str(addr))
-                print("received  data: " + str(data))
+            # try:
+            data, addr = self.sock.recvfrom(8192)
+            print()
+            print("receiving from: " + str(addr))
+            # print("received  data: " + str(data))
 
-                # 新线程处理数据
-                newThread = threading.Thread(
-                    target=self.ClientDataHandler, args=(data, addr))
-                newThread.start()
+            # 新线程处理数据
+            # newThread = threading.Thread(
+            #    target=self.ClientDataHandler, args=(data, addr))
+            # newThread.start()
 
-            except Exception as e:
-                print()
-                print("ERROR RECEIVING: " + str(e))
+            self.ClientDataHandler(data, addr)
+
+            # except Exception as e:
+            #    print()
+            #    print("ERROR RECEIVING: " + str(e))
 
     ########################################################################################
     # 处理收到的数据
@@ -108,7 +110,10 @@ class ChatServerUDP:
             header.packetSize, \
             header.msgType = headerTuple
 
-        if header.msgType == header_client.ClientMsgType.LOGIN_REQUEST.value:
+        if header.msgType == header_client.ClientMsgType.CHAT_CONTENT_CLIENT.value:
+            self.ChatContent(data, addr)
+
+        elif header.msgType == header_client.ClientMsgType.LOGIN_REQUEST.value:
             headerRequest = header_client.LoginRequestHeader()
 
             if header.headerSize != headerRequest.headerSize or header.packetSize != headerRequest.packetSize:
@@ -142,14 +147,6 @@ class ChatServerUDP:
                 headerRequest.thisUserID = headerRequestTuple
 
             self.LogoutRequest(headerRequest, addr)
-
-        elif header.msgType == header_client.ClientMsgType.CHAT_CONTENT_CLIENT.value:
-            if header.headerSize != header_client.TextMsgHeader().headerSize and \
-                    header.headerSize != header_client.FileMsgHeader().headerSize:
-                print("PACKET FORMAT ERROR!!!")
-                return
-
-            self.ChatContent(data, addr)
 
         elif header.msgType == header_client.ClientMsgType.CHAT_REQUEST.value:
             headerRequest = header_client.ChatRequestHeader()
@@ -243,66 +240,43 @@ class ChatServerUDP:
               str((addr[0], remotePort)) + " - " + str(bytesToSend))
 
     def ChatContent(self, data: bytes, addr):
+        # 尝试以FILE解析
+        headerContent = header_client.FileMsgHeader()
+        if headerContent.headerSize < len(data):
+            headerContentTuple = struct.unpack(
+                headerContent.struct, data[0:headerContent.headerSize])
+            headerContent.contentType = headerContentTuple[5]
+            headerContent.packetSeq = headerContentTuple[6]
+        else:
+            headerContent = header_client.TextMsgHeader()
+            headerContentTuple = struct.unpack(
+                headerContent.struct, data[0:headerContent.headerSize])
+            headerContent.contentType = headerContentTuple[5]
+            headerContent.packetSeq = headerContentTuple[6]
+
         # 发送ACK信息
         ackHeader = header_server.PacketReplyHeader()
-        ackHeader.md5Hash = md5(data).digest()
+        # ackHeader.md5Hash = md5(data).digest()
+        ackHeader.packetSeq = headerContent.packetSeq
         ackHeaderBytes = struct.pack(ackHeader.struct,
                                      ackHeader.headerSize,
                                      ackHeader.packetSize,
                                      ackHeader.msgType,
-                                     ackHeader.md5Hash)
+                                     # ackHeader.md5Hash
+                                     ackHeader.packetSeq)
         self.sock.sendto(ackHeaderBytes, (addr[0], remotePort))
-        print("sent ACK MESSAGE to: " + str((addr[0], remotePort)))
+        print("sent ACK MESSAGE to: " +
+              str((addr[0], remotePort)) + ", packetSeq=" + str(ackHeader.packetSeq))
 
-        # TEXT消息提交头：尝试解析
-        headerContent = header_client.TextMsgHeader()
-        headerContentTuple = struct.unpack(
-            headerContent.struct, data[0:headerContent.headerSize])
-        headerContent.contentType = headerContentTuple[5]
-
-        if headerContent.contentType == header_client.ChatContentType.TEXT.value:
-            headerContent.headerSize, \
-                headerContent.packetSize, \
-                headerContent.msgType, \
-                headerContent.fromUserID, \
-                headerContent.targetUserID, \
-                headerContent.contentType = headerContentTuple
-
-            textSize = headerContent.packetSize - headerContent.headerSize
-            structText = "@" + str(textSize) + "s"  # no alignment needed!
-            textBytes = struct.unpack(
-                structText, data[headerContent.headerSize:len(data)])[0]
-            textStr = str(textBytes, encoding="utf-8")
-
-            # 处理TEXT信息
-            if headerContent.targetUserID == 0:
-                # message to server
-                print("SERVER RECEIVE MESSAGE: " + textStr)
-
-            else:
-                if headerContent.targetUserID not in self.users.keys():
-                    print("Text msg from: " + str(headerContent.fromUserID) +
-                          " to: " + str(headerContent.targetUserID) + " (TARGET USER NOT DEFINED!)")
-                    return
-
-                # todo: 装入暂存区
-                self.users[headerContent.targetUserID].pendingTextMsg.append()
-
-                print("Text msg from: " + str(headerContent.fromUserID) +
-                      " to: " + str(headerContent.targetUserID) + "...")
-
-        # FILE消息提交头：尝试TEXT失败，重新以FILE解包
-        elif headerContent.contentType == header_client.ChatContentType.FILE.value:
-            headerContent = header_client.FileMsgHeader()
-            headerContentTuple = struct.unpack(
-                headerContent.struct, data[0:headerContent.headerSize])
-
+        # FILE消息提交头
+        if headerContent.contentType == header_client.ChatContentType.FILE.value:
             headerContent.headerSize, \
                 headerContent.packetSize, \
                 headerContent.msgType, \
                 headerContent.fromUserID, \
                 headerContent.targetUserID, \
                 headerContent.contentType, \
+                headerContent.packetSeq, \
                 headerContent.fileNameLength, \
                 headerContent.packetCountTotal, \
                 headerContent.packetCountCurrent = headerContentTuple
@@ -347,25 +321,59 @@ class ChatServerUDP:
             # ! 需要发送端逐个发送，或至少保证最后一个包最后发送
             if headerContent.packetCountCurrent == headerContent.packetCountTotal - 1:
                 # 储存文件
-                fileValid = True
+                packetLost = 0
                 for i in range(headerContent.packetCountTotal):
                     if i not in self.fileDict[fileNameStr].keys():
                         # 文件不完整
-                        fileValid = False
-                        break
+                        packetLost += 1
 
-                    self.file[fileNameStr].write(self.fileDict[fileNameStr][i])
+                    else:
+                        self.file[fileNameStr].write(
+                            self.fileDict[fileNameStr][i])
 
-                if fileValid:
+                if packetLost == 0:
                     print("FILE: " + fileNameStr + " RECV SUCCESS!")
                 else:
-                    print("FILE: " + fileNameStr + " RECV FAILED!")
+                    print("FILE: " + fileNameStr +
+                          " RECV FAILED, PACKET LOST: " + str(packetLost))
 
                 # 删除内存暂存区
                 # ? 需要如何才能更好地防文件名冲突？
                 self.file[fileNameStr].close()
                 self.file[fileNameStr] = "FILE WRITTEN!"
                 self.fileDict[fileNameStr] = "FILE WRITTEN!"
+
+        elif headerContent.contentType == header_client.ChatContentType.TEXT.value:
+            headerContent.headerSize, \
+                headerContent.packetSize, \
+                headerContent.msgType, \
+                headerContent.fromUserID, \
+                headerContent.targetUserID, \
+                headerContent.contentType, \
+                headerContent.packetSeq = headerContentTuple
+
+            textSize = headerContent.packetSize - headerContent.headerSize
+            structText = "@" + str(textSize) + "s"  # no alignment needed!
+            textBytes = struct.unpack(
+                structText, data[headerContent.headerSize:len(data)])[0]
+            textStr = str(textBytes, encoding="utf-8")
+
+            # 处理TEXT信息
+            if headerContent.targetUserID == 0:
+                # message to server
+                print("SERVER RECEIVE MESSAGE: " + textStr)
+
+            else:
+                if headerContent.targetUserID not in self.users.keys():
+                    print("Text msg from: " + str(headerContent.fromUserID) +
+                          " to: " + str(headerContent.targetUserID) + " (TARGET USER NOT DEFINED!)")
+                    return
+
+                # todo: 装入暂存区
+                self.users[headerContent.targetUserID].pendingTextMsg.append()
+
+                print("Text msg from: " + str(headerContent.fromUserID) +
+                      " to: " + str(headerContent.targetUserID) + "...")
 
     def ChatRequest(self, headerRequest: header_client.ChatRequestHeader, addr):
         headerReply = header_server.ChatRequestReplyHeader()

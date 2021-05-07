@@ -60,23 +60,28 @@ class HeaderBase:
 
 class PacketReplyHeader:
     def __init__(self):
-        self.struct = "@HHH16s"
+        self.struct = "@HHBH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
         self.msgType = ServerMsgType.MSG_SERVER_ACK.value
 
-        self.md5Hash = "0123456789012345"  # 16 bytes
+        # self.md5Hash = "0123456789012345"  # 16 bytes
+
+        self.packetSeq = 0
 
 
 '''
     struct PacketReplyHeader
     {
-        quint16 headerSize = sizeof(PacketReplyHeader);
-        quint16 packetSize = sizeof(PacketReplyHeader);
-        quint8 msgType = ServerMsgType::MSG_SERVER_ACK;
+        const quint16 headerSize = sizeof(PacketReplyHeader);
+        const quint16 packetSize = sizeof(PacketReplyHeader);
+        const quint8 msgType = ServerMsgType::MSG_SERVER_ACK;
 
-        unsigned char md5Hash[16];
+        // const quint8 placeHolder = 0; // 字节对齐
+        // unsigned char md5Hash[16];
+
+        quint16 packetSeq = 0;
     };
 '''
 

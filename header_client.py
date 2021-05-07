@@ -81,7 +81,7 @@ class LogoutRequestHeader:
 
 class TextMsgHeader:
     def __init__(self):
-        self.struct = "@HHBHHBB"
+        self.struct = "@HHBHHBH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -90,6 +90,8 @@ class TextMsgHeader:
         self.fromUserID = 0
         self.targetUserID = 0
         self.contentType = ChatContentType.TEXT.value
+
+        self.packetSeq = 0
 
 
 '''
@@ -102,6 +104,8 @@ class TextMsgHeader:
         quint16 fromUserID;
         quint16 targetUserID;
         quint8 contentType = ChatContentType::TEXT;
+
+        quint16 packetSeq;
     };
 '''
 
@@ -112,7 +116,7 @@ class TextMsgHeader:
 
 class FileMsgHeader:
     def __init__(self):
-        self.struct = "@HHBHHBBII"
+        self.struct = "@HHBHHBHBII"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -121,6 +125,8 @@ class FileMsgHeader:
         self.fromUserID = 0
         self.targetUserID = 0
         self.contentType = ChatContentType.FILE.value
+
+        self.packetSeq = 0
 
         self.fileNameLength = 0
 
@@ -139,12 +145,13 @@ class FileMsgHeader:
         quint16 targetUserID;
         quint8 contentType = ChatContentType::FILE;
 
+        quint16 packetSeq;
+
         quint8 fileNameLength;
 
         // 分包信息
         quint32 packetCountTotal;
         quint32 packetCountCurrent;
-        
         
     };
 '''
