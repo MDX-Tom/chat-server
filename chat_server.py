@@ -305,49 +305,60 @@ class ChatServerUDP:
                 fileNameRename = fileNameStr
                 if not os.path.exists("./Received/"):
                     os.mkdir("./Received/")
+
+                '''
                 while fileNameRename in self.fileDict.keys() or os.path.exists("./Received/" + fileNameRename):
                     fileNameRename = fileNameStr + "(" + str(fileRename) + ")"
                     fileRename += 1
                 fileNameStr = fileNameRename
+                '''
+
+                if os.path.exists("./Received/" + fileNameRename):
+                    print("文件已存在，即将覆盖！文件名：" + fileNameRename)
+                    os.remove("./Received/" + fileNameRename)
 
                 # 创建文件
                 print("New File: " + fileNameStr)
                 # ! 要求一次只发一个文件
                 self.currentFileName = fileNameStr
 
-                self.fileDict[fileNameStr] = {}
-                self.file[fileNameStr] = open(
-                    "./Received/" + fileNameStr, mode="ab")
+                self.fileDict[self.currentFileName] = {}
+                self.file[self.currentFileName] = ""
 
             # ! 要求一次只发一个文件
-            self.fileDict[self.currentFileName][headerContent.packetCountCurrent] = fragmentBytes
+            if not self.fileDict[self.currentFileName] == "FILE WRITTEN!":
+                self.fileDict[self.currentFileName][headerContent.packetCountCurrent] = fragmentBytes
 
             # 传输完成
             # ! 要求一次只发一个文件
             # ! 发送端发完文件还需要单独发一个“发送结束包”，此包packetCountCurrent超出范围即可
             if headerContent.packetCountCurrent > headerContent.packetCountTotal:
-                # 储存文件
-                packetLost = 0
-                for i in range(1, headerContent.packetCountTotal + 1):
-                    if i not in self.fileDict[self.currentFileName].keys():
-                        # 文件不完整
-                        packetLost += 1
+                if not self.file[self.currentFileName] == "FILE WRITTEN!":
 
+                    # 储存文件
+                    self.file[self.currentFileName] = open(
+                        "./Received/" + fileNameStr, mode="ab")
+                    packetLost = 0
+                    for i in range(1, headerContent.packetCountTotal + 1):
+                        if i not in self.fileDict[self.currentFileName].keys():
+                            # 文件不完整
+                            packetLost += 1
+
+                        else:
+                            self.file[self.currentFileName].write(
+                                self.fileDict[self.currentFileName][i])
+
+                    if packetLost == 0:
+                        print("FILE: " + self.currentFileName + " RECV SUCCESS!")
                     else:
-                        self.file[self.currentFileName].write(
-                            self.fileDict[self.currentFileName][i])
+                        print("FILE: " + self.currentFileName +
+                              " RECV FAILED, PACKET LOST: " + str(packetLost))
 
-                if packetLost == 0:
-                    print("FILE: " + self.currentFileName + " RECV SUCCESS!")
-                else:
-                    print("FILE: " + self.currentFileName +
-                          " RECV FAILED, PACKET LOST: " + str(packetLost))
-
-                # 删除内存暂存区
-                # todo 需要如何才能更好地防文件名冲突？
-                self.file[self.currentFileName].close()
-                self.file[self.currentFileName] = "FILE WRITTEN!"
-                self.fileDict[self.currentFileName] = "FILE WRITTEN!"
+                    # 删除内存暂存区
+                    # todo 需要如何才能更好地防文件名冲突？
+                    self.file[self.currentFileName].close()
+                    self.file[self.currentFileName] = "FILE WRITTEN!"
+                    self.fileDict[self.currentFileName] = "FILE WRITTEN!"
 
         elif headerContent.contentType == header_client.ChatContentType.TEXT.value:
             headerContent.headerSize, \
