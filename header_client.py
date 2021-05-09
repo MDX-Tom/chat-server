@@ -131,7 +131,7 @@ class FileMsgHeader:
         self.fileNameLength = 0
 
         self.packetCountTotal = 1
-        self.packetCountCurrent = 0  # ! Starts from 0.
+        self.packetCountCurrent = 1  # ! Starts from 1.
 
 
 '''

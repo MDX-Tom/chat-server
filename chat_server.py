@@ -16,6 +16,8 @@ import header_client
 localIP = "0.0.0.0"
 localPort = 8002
 remotePort = 8003
+
+remotePacketSize = 8192
 udpBufferSize = 1000000000
 
 
@@ -60,6 +62,7 @@ class ChatServerUDP:
         # FILE暂存
         self.fileDict = {}  # 暂存文件分片
         self.file = {}  # 暂存file.open对象
+        self.currentFileName = ""
 
     def open(self):
         """启动监听"""
@@ -80,7 +83,7 @@ class ChatServerUDP:
             self.listenEvent.wait()
 
             # try:
-            data, addr = self.sock.recvfrom(8192)
+            data, addr = self.sock.recvfrom(remotePacketSize)
             print()
             print("receiving from: " + str(addr))
             # print("received  data: " + str(data))
@@ -295,8 +298,9 @@ class ChatServerUDP:
                 structFragment, data[headerContent.headerSize + headerContent.fileNameLength:len(data)])[0]
 
             # 在内存中暂存分片信息
-            if headerContent.packetCountCurrent == 0:
+            if headerContent.packetCountCurrent == 1:
                 # 文件名防冲突
+                # ! 要求一次只发一个文件
                 fileRename = 1
                 fileNameRename = fileNameStr
                 if not os.path.exists("./Received/"):
@@ -308,40 +312,42 @@ class ChatServerUDP:
 
                 # 创建文件
                 print("New File: " + fileNameStr)
+                # ! 要求一次只发一个文件
+                self.currentFileName = fileNameStr
 
                 self.fileDict[fileNameStr] = {}
                 self.file[fileNameStr] = open(
                     "./Received/" + fileNameStr, mode="ab")
 
-            # ! BUG: 重复接收文件时，其他的包也需要修改文件名！
-
-            self.fileDict[fileNameStr][headerContent.packetCountCurrent] = fragmentBytes
+            # ! 要求一次只发一个文件
+            self.fileDict[self.currentFileName][headerContent.packetCountCurrent] = fragmentBytes
 
             # 传输完成
-            # ! 需要发送端逐个发送，或至少保证最后一个包最后发送
-            if headerContent.packetCountCurrent == headerContent.packetCountTotal - 1:
+            # ! 要求一次只发一个文件
+            # ! 发送端发完文件还需要单独发一个“发送结束包”，此包packetCountCurrent超出范围即可
+            if headerContent.packetCountCurrent > headerContent.packetCountTotal:
                 # 储存文件
                 packetLost = 0
-                for i in range(headerContent.packetCountTotal):
-                    if i not in self.fileDict[fileNameStr].keys():
+                for i in range(1, headerContent.packetCountTotal + 1):
+                    if i not in self.fileDict[self.currentFileName].keys():
                         # 文件不完整
                         packetLost += 1
 
                     else:
-                        self.file[fileNameStr].write(
-                            self.fileDict[fileNameStr][i])
+                        self.file[self.currentFileName].write(
+                            self.fileDict[self.currentFileName][i])
 
                 if packetLost == 0:
-                    print("FILE: " + fileNameStr + " RECV SUCCESS!")
+                    print("FILE: " + self.currentFileName + " RECV SUCCESS!")
                 else:
-                    print("FILE: " + fileNameStr +
+                    print("FILE: " + self.currentFileName +
                           " RECV FAILED, PACKET LOST: " + str(packetLost))
 
                 # 删除内存暂存区
-                # ? 需要如何才能更好地防文件名冲突？
-                self.file[fileNameStr].close()
-                self.file[fileNameStr] = "FILE WRITTEN!"
-                self.fileDict[fileNameStr] = "FILE WRITTEN!"
+                # todo 需要如何才能更好地防文件名冲突？
+                self.file[self.currentFileName].close()
+                self.file[self.currentFileName] = "FILE WRITTEN!"
+                self.fileDict[self.currentFileName] = "FILE WRITTEN!"
 
         elif headerContent.contentType == header_client.ChatContentType.TEXT.value:
             headerContent.headerSize, \
