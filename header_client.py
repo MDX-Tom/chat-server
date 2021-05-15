@@ -116,7 +116,7 @@ class TextMsgHeader:
 
 class FileMsgHeader:
     def __init__(self):
-        self.struct = "@HHBHHBHBII"
+        self.struct = "@HHBBHHBBHBII"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize

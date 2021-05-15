@@ -37,7 +37,7 @@ class Status(Enum):
 
 class HeaderBase:
     def __init__(self):
-        self.struct = "@HHH"
+        self.struct = "@HHBB"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize

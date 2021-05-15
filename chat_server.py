@@ -85,7 +85,8 @@ class ChatServerUDP:
             # try:
             data, addr = self.sock.recvfrom(remotePacketSize)
             print()
-            print("receiving from: " + str(addr))
+            print("receiving from: " + str(addr) +
+                  " PACKET SIZE: " + str(len(data)))
             # print("received  data: " + str(data))
 
             # 新线程处理数据
@@ -111,7 +112,8 @@ class ChatServerUDP:
         headerTuple = struct.unpack(header.struct, data[0:header.headerSize])
         header.headerSize, \
             header.packetSize, \
-            header.msgType = headerTuple
+            header.msgType, \
+            placeHolder = headerTuple
 
         if header.msgType == header_client.ClientMsgType.CHAT_CONTENT_CLIENT.value:
             self.ChatContent(data, addr)
@@ -248,8 +250,8 @@ class ChatServerUDP:
         if headerContent.headerSize < len(data):
             headerContentTuple = struct.unpack(
                 headerContent.struct, data[0:headerContent.headerSize])
-            headerContent.contentType = headerContentTuple[5]
-            headerContent.packetSeq = headerContentTuple[6]
+            headerContent.contentType = headerContentTuple[6]
+            headerContent.packetSeq = headerContentTuple[8]
         else:
             headerContent = header_client.TextMsgHeader()
             headerContentTuple = struct.unpack(
@@ -276,9 +278,11 @@ class ChatServerUDP:
             headerContent.headerSize, \
                 headerContent.packetSize, \
                 headerContent.msgType, \
+                placeHolder, \
                 headerContent.fromUserID, \
                 headerContent.targetUserID, \
                 headerContent.contentType, \
+                placeHolder, \
                 headerContent.packetSeq, \
                 headerContent.fileNameLength, \
                 headerContent.packetCountTotal, \
