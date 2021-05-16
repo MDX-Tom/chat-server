@@ -116,7 +116,7 @@ class TextMsgHeader:
 
 class FileMsgHeader:
     def __init__(self):
-        self.struct = "@HHBBHHBBHBII"
+        self.struct = "@HHBBHHBBII"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
@@ -125,9 +125,6 @@ class FileMsgHeader:
         self.fromUserID = 0
         self.targetUserID = 0
         self.contentType = ChatContentType.FILE.value
-
-        self.packetSeq = 0
-
         self.fileNameLength = 0
 
         self.packetCountTotal = 1

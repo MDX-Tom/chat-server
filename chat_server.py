@@ -84,9 +84,10 @@ class ChatServerUDP:
 
             # try:
             data, addr = self.sock.recvfrom(remotePacketSize)
-            print()
-            print("receiving from: " + str(addr) +
-                  " PACKET SIZE: " + str(len(data)))
+
+            # print()
+            # print("receiving from: " + str(addr) +
+            #      " PACKET SIZE: " + str(len(data)))
             # print("received  data: " + str(data))
 
             # 新线程处理数据
@@ -251,27 +252,11 @@ class ChatServerUDP:
             headerContentTuple = struct.unpack(
                 headerContent.struct, data[0:headerContent.headerSize])
             headerContent.contentType = headerContentTuple[6]
-            headerContent.packetSeq = headerContentTuple[8]
         else:
             headerContent = header_client.TextMsgHeader()
             headerContentTuple = struct.unpack(
                 headerContent.struct, data[0:headerContent.headerSize])
             headerContent.contentType = headerContentTuple[5]
-            headerContent.packetSeq = headerContentTuple[6]
-
-        # 发送ACK信息
-        ackHeader = header_server.PacketReplyHeader()
-        # ackHeader.md5Hash = md5(data).digest()
-        ackHeader.packetSeq = headerContent.packetSeq
-        ackHeaderBytes = struct.pack(ackHeader.struct,
-                                     ackHeader.headerSize,
-                                     ackHeader.packetSize,
-                                     ackHeader.msgType,
-                                     # ackHeader.md5Hash
-                                     ackHeader.packetSeq)
-        self.sock.sendto(ackHeaderBytes, (addr[0], remotePort))
-        print("sent ACK MESSAGE to: " +
-              str((addr[0], remotePort)) + ", packetSeq=" + str(ackHeader.packetSeq))
 
         # FILE消息提交头
         if headerContent.contentType == header_client.ChatContentType.FILE.value:
@@ -282,11 +267,23 @@ class ChatServerUDP:
                 headerContent.fromUserID, \
                 headerContent.targetUserID, \
                 headerContent.contentType, \
-                placeHolder, \
-                headerContent.packetSeq, \
                 headerContent.fileNameLength, \
                 headerContent.packetCountTotal, \
                 headerContent.packetCountCurrent = headerContentTuple
+
+            # 发送ACK信息
+            ackHeader = header_server.FilePacketReplyHeader()
+            # ackHeader.md5Hash = md5(data).digest()
+            ackHeader.filePacketSeq = headerContent.packetCountCurrent
+            ackHeaderBytes = struct.pack(ackHeader.struct,
+                                         ackHeader.headerSize,
+                                         ackHeader.packetSize,
+                                         ackHeader.msgType,
+                                         # ackHeader.md5Hash
+                                         ackHeader.filePacketSeq)
+            self.sock.sendto(ackHeaderBytes, (addr[0], remotePort))
+            # print("sent ACK MESSAGE to: " +
+            #      str((addr[0], remotePort)) + ", filePacketSeq=" + str(ackHeader.filePacketSeq))
 
             # 紧跟Header是文件名
             structFileName = "@" + str(headerContent.fileNameLength) + "s"
@@ -371,7 +368,21 @@ class ChatServerUDP:
                 headerContent.fromUserID, \
                 headerContent.targetUserID, \
                 headerContent.contentType, \
-                headerContent.packetSeq = headerContentTuple
+                headerContent.textPacketSeq = headerContentTuple
+
+            # 发送ACK信息
+            ackHeader = header_server.TextPacketReplyHeader()
+            # ackHeader.md5Hash = md5(data).digest()
+            ackHeader.textPacketSeq = headerContent.textPacketSeq
+            ackHeaderBytes = struct.pack(ackHeader.struct,
+                                         ackHeader.headerSize,
+                                         ackHeader.packetSize,
+                                         ackHeader.msgType,
+                                         # ackHeader.md5Hash
+                                         ackHeader.textPacketSeq)
+            self.sock.sendto(ackHeaderBytes, (addr[0], remotePort))
+            # print("sent ACK MESSAGE to: " +
+            #      str((addr[0], remotePort)) + ", textPacketSeq=" + str(ackHeader.textPacketSeq))
 
             textSize = headerContent.packetSize - headerContent.headerSize
             structText = "@" + str(textSize) + "s"  # no alignment needed!

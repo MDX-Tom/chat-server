@@ -12,7 +12,8 @@ class ChatContentType(Enum):
 
 
 class ServerMsgType(Enum):
-    MSG_SERVER_ACK = 11  # Reliable UDP
+    MSG_SERVER_ACK_TEXT = 11  # Reliable UDP
+    MSG_SERVER_ACK_FILE = 12
 
     CHAT_CONTENT_SERVER = 21
     LOGIN_REPLY = 31
@@ -58,17 +59,30 @@ class HeaderBase:
 ########################################################################
 
 
-class PacketReplyHeader:
+class TextPacketReplyHeader:
     def __init__(self):
         self.struct = "@HHBH"
 
         self.headerSize = calcsize(self.struct)
         self.packetSize = self.headerSize
-        self.msgType = ServerMsgType.MSG_SERVER_ACK.value
+        self.msgType = ServerMsgType.MSG_SERVER_ACK_TEXT.value
 
         # self.md5Hash = "0123456789012345"  # 16 bytes
 
-        self.packetSeq = 0
+        self.textPacketSeq = 0
+
+
+class FilePacketReplyHeader:
+    def __init__(self):
+        self.struct = "@HHBI"
+
+        self.headerSize = calcsize(self.struct)
+        self.packetSize = self.headerSize
+        self.msgType = ServerMsgType.MSG_SERVER_ACK_FILE.value
+
+        # self.md5Hash = "0123456789012345"  # 16 bytes
+
+        self.filePacketSeq = 0
 
 
 '''
